@@ -55,7 +55,6 @@ jobs:
         ./scripts/config --enable CONFIG_FAIL_PAGE_ALLOC
         ./scripts/config --enable CONFIG_FAIL_MAKE_REQUEST
         ./scripts/config --disable CONFIG_RANDOMIZE_BASE
-        ./scripts/config --disable CONFIG_MODULES
         make olddefconfig
 
     - name: Compilar el kernel

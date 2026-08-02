@@ -1,0 +1,75 @@
+name: Compilar Kernel Linux 7.1.5 para Syzkaller
+
+on:
+  workflow_dispatch:  # Solo se ejecuta manualmente desde la interfaz de GitHub
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Instalar dependencias del sistema
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential libncurses-dev bison flex libssl-dev libelf-dev \
+          bc git wget rsync debhelper
+
+    - name: Descargar el código fuente del kernel v7.1.5
+      run: |
+        wget https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz
+        tar -xf linux-7.1.5.tar.xz
+        mv linux-7.1.5 linux-source
+
+    - name: Configurar el kernel para Syzkaller
+      run: |
+        cd linux-source
+
+        ./scripts/config --enable CONFIG_KCOV
+        ./scripts/config --enable CONFIG_KCOV_INSTRUMENT_ALL
+        ./scripts/config --enable CONFIG_DEBUG_FS
+        ./scripts/config --enable CONFIG_CONFIGFS_FS
+        ./scripts/config --enable CONFIG_SECURITYFS
+        ./scripts/config --enable CONFIG_KALLSYMS
+        ./scripts/config --enable CONFIG_KALLSYMS_ALL
+        ./scripts/config --enable CONFIG_USER_NS
+        ./scripts/config --enable CONFIG_CGROUP_PIDS
+        ./scripts/config --enable CONFIG_MEMCG
+        ./scripts/config --enable CONFIG_FAULT_INJECTION_DEBUG_FS
+        ./scripts/config --enable CONFIG_KASAN
+        ./scripts/config --enable CONFIG_KASAN_INLINE
+        ./scripts/config --enable CONFIG_UBSAN
+        ./scripts/config --enable CONFIG_NAMESPACES
+        ./scripts/config --enable CONFIG_UTS_NS
+        ./scripts/config --enable CONFIG_IPC_NS
+        ./scripts/config --enable CONFIG_PID_NS
+        ./scripts/config --enable CONFIG_NET_NS
+        ./scripts/config --enable CONFIG_VIRTIO_PCI
+        ./scripts/config --enable CONFIG_VIRTIO_NET
+        ./scripts/config --enable CONFIG_VIRTIO_BLK
+        ./scripts/config --enable CONFIG_TUN
+        ./scripts/config --enable CONFIG_DEBUG_INFO
+        ./scripts/config --enable CONFIG_DEBUG_INFO_DWARF4
+        ./scripts/config --enable CONFIG_FAULT_INJECTION
+        ./scripts/config --enable CONFIG_FAILSLAB
+        ./scripts/config --enable CONFIG_FAIL_PAGE_ALLOC
+        ./scripts/config --enable CONFIG_FAIL_MAKE_REQUEST
+        ./scripts/config --disable CONFIG_RANDOMIZE_BASE
+        ./scripts/config --disable CONFIG_MODULES
+        make olddefconfig
+
+    - name: Compilar el kernel
+      run: |
+        cd linux-source
+        # Usa todos los núcleos disponibles (el runner de GitHub tiene 2)
+        make -j$(nproc) deb-pkg
+
+    - name: Subir artefactos
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-7.1.5-syzkaller
+        path: |
+          ../*.deb
+          ../*.ddeb   # Si existen (símbolos de depuración)
+          ../*.changes
+          ../*.buildinfo

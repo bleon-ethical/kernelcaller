@@ -1,7 +1,7 @@
 name: Compilar Kernel Linux 7.1.5 para Syzkaller
 
 on:
-  workflow_dispatch:  # Solo se ejecuta manualmente desde la interfaz de GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -72,8 +72,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: kernel-7.1.5-syzkaller
-        path: |
-          ../*.deb
-          ../*.ddeb   # Si existen (símbolos de depuración)
-          ../*.changes
-          ../*.buildinfo
+        path: packages/

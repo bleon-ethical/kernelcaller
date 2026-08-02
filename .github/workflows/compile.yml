@@ -13,7 +13,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           build-essential libncurses-dev bison flex libssl-dev libelf-dev \
-          bc git wget rsync debhelper
+          bc git wget rsync debhelper libdw-dev
 
     - name: Descargar el código fuente del kernel v7.1.5
       run: |

@@ -66,7 +66,7 @@ jobs:
     - name: Mover artefactos a carpeta permitida
       run: |
         mkdir -p packages
-        find . -maxdepth 2 -type f \( -name "*.deb" -o -name "*.ddeb" -o -name "*.changes" -o -name "*.buildinfo" \) -exec mv -v {} packages/ \;
+        find . -maxdepth 1 -type f \( -name "*.deb" -o -name "*.ddeb" -o -name "*.changes" -o -name "*.buildinfo" \) -exec mv -v {} packages/ \;
         if [ -z "$(ls -A packages/)" ]; then
           echo "No se encontraron archivos de paquete. Listando el contenido del workspace:"
           ls -la
@@ -74,6 +74,7 @@ jobs:
         else
           echo "Archivos encontrados:"
           ls -la packages/
+        if
         
     - name: Subir artefactos
       uses: actions/upload-artifact@v4

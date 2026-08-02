@@ -62,7 +62,7 @@ jobs:
       run: |
         cd linux-source
         # Usa todos los núcleos disponibles (el runner de GitHub tiene 2)
-        make -j$(nproc) deb-pkg
+        make -j$(nproc) bindeb-pkg
 
     - name: Subir artefactos
       uses: actions/upload-artifact@v4

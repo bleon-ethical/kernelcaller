@@ -57,13 +57,14 @@ jobs:
         ./scripts/config --enable CONFIG_ATA
         ./scripts/config --enable CONFIG_ATA_PIIX
         ./scripts/config --enable CONFIG_PATA_ACPI
+        ./scripts/config --enable CONFIG_SCSI
         ./scripts/config --enable CONFIG_MODULES
         ./scripts/config --enable CONFIG_MODULE_UNLOAD
         ./scripts/config --disable CONFIG_RANDOMIZE_BASE
 
 
         make olddefconfig
-
+        grep CONFIG_ATA_PIIX .config || echo "ERROR: ATA_PIIX no está habilitado"
     - name: Compilar el kernel
       run: |
         cd linux-source

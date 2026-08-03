@@ -8,6 +8,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Limpiar caché y forzar actualización
+      run: |
+        sudo rm -rf linux-source packages *.deb *.ddeb *.changes *.buildinfo
+        sudo apt-get clean
+        echo "✅ Caché limpiada"
+
     - name: Instalar dependencias del sistema
       run: |
         sudo apt-get update
@@ -20,11 +26,29 @@ jobs:
         wget https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz
         tar -xf linux-7.1.5.tar.xz
         mv linux-7.1.5 linux-source
+        echo "✅ Kernel descargado"
 
     - name: Configurar el kernel para Syzkaller
       run: |
         cd linux-source
-
+        
+        echo "=== 1. Creando configuración base ==="
+        make defconfig
+        
+        echo "=== 2. FORZANDO ATA y SCSI (método 1: sed) ==="
+        sed -i 's/# CONFIG_ATA is not set/CONFIG_ATA=y/' .config
+        sed -i 's/# CONFIG_ATA_PIIX is not set/CONFIG_ATA_PIIX=y/' .config
+        sed -i 's/# CONFIG_PATA_ACPI is not set/CONFIG_PATA_ACPI=y/' .config
+        sed -i 's/# CONFIG_SCSI is not set/CONFIG_SCSI=y/' .config
+        
+        echo "=== 3. FORZANDO ATA (método 2: echo al final) ==="
+        echo "CONFIG_ATA=y" >> .config
+        echo "CONFIG_ATA_PIIX=y" >> .config
+        echo "CONFIG_PATA_ACPI=y" >> .config
+        echo "CONFIG_SCSI=y" >> .config
+        echo "CONFIG_EXT4_FS=y" >> .config
+        
+        echo "=== 4. Configurando opciones de Syzkaller ==="
         ./scripts/config --enable CONFIG_KCOV
         ./scripts/config --enable CONFIG_KCOV_INSTRUMENT_ALL
         ./scripts/config --enable CONFIG_DEBUG_FS
@@ -54,36 +78,71 @@ jobs:
         ./scripts/config --enable CONFIG_FAILSLAB
         ./scripts/config --enable CONFIG_FAIL_PAGE_ALLOC
         ./scripts/config --enable CONFIG_FAIL_MAKE_REQUEST
+        ./scripts/config --enable CONFIG_MODULES
+        ./scripts/config --enable CONFIG_MODULE_UNLOAD
+        ./scripts/config --disable CONFIG_RANDOMIZE_BASE
+        
+        echo "=== 5. RE-FORZANDO ATA después de scripts/config ==="
         ./scripts/config --enable CONFIG_ATA
         ./scripts/config --enable CONFIG_ATA_PIIX
         ./scripts/config --enable CONFIG_PATA_ACPI
         ./scripts/config --enable CONFIG_SCSI
-        ./scripts/config --enable CONFIG_MODULES
-        ./scripts/config --enable CONFIG_MODULE_UNLOAD
-        ./scripts/config --disable CONFIG_RANDOMIZE_BASE
-
-
+        ./scripts/config --enable CONFIG_EXT4_FS
+        
+        echo "=== 6. Resolviendo dependencias ==="
         make olddefconfig
-        grep CONFIG_ATA_PIIX .config || echo "ERROR: ATA_PIIX no está habilitado"
+        
+        echo "=== 7. VERIFICACIÓN OBLIGATORIA ==="
+        echo "--- Buscando CONFIG_ATA ---"
+        grep CONFIG_ATA .config || echo "❌ ERROR: CONFIG_ATA no encontrado"
+        
+        echo "--- Buscando CONFIG_ATA_PIIX ---"
+        if grep -q "CONFIG_ATA_PIIX=y" .config; then
+          echo "✅ CONFIG_ATA_PIIX está habilitado correctamente"
+        else
+          echo "❌ ERROR CRÍTICO: CONFIG_ATA_PIIX NO está habilitado"
+          echo "=== CONTENIDO COMPLETO DE .config (búsqueda ATA) ==="
+          grep -i ata .config || echo "No se encontró ninguna línea con ATA"
+          echo "=== PRIMERAS 50 LÍNEAS DE .config ==="
+          head -50 .config
+          exit 1
+        fi
+        
+        echo "--- Buscando CONFIG_SCSI ---"
+        grep CONFIG_SCSI .config || echo "❌ ERROR: CONFIG_SCSI no encontrado"
+        
+        echo "--- Buscando CONFIG_EXT4_FS ---"
+        grep CONFIG_EXT4_FS .config || echo "❌ ERROR: CONFIG_EXT4_FS no encontrado"
+        
+        echo "=== ✅ CONFIGURACIÓN COMPLETA ==="
+        echo "Total de líneas en .config: $(wc -l < .config)"
+        echo "Opciones habilitadas: $(grep -c '=y' .config)"
+
     - name: Compilar el kernel
       run: |
         cd linux-source
-        # Usa todos los núcleos disponibles (el runner de GitHub tiene 2)
+        echo "=== Iniciando compilación ==="
         make -j$(nproc) bindeb-pkg
+        echo "✅ Compilación completada"
 
     - name: Mover artefactos a carpeta permitida
       run: |
         mkdir -p packages
+        echo "=== Buscando archivos generados ==="
         find . -maxdepth 1 -type f \( -name "*.deb" -o -name "*.ddeb" -o -name "*.changes" -o -name "*.buildinfo" \) -exec mv -v {} packages/ \;
+        
         if [ -z "$(ls -A packages/)" ]; then
-          echo "No se encontraron archivos de paquete. Listando el contenido del workspace:"
+          echo "❌ No se encontraron archivos de paquete"
+          echo "=== Contenido del directorio actual ==="
           ls -la
+          echo "=== Contenido de linux-source/ ==="
           ls -la linux-source/ 2>/dev/null || echo "linux-source/ no existe"
+          exit 1
         else
-          echo "Archivos encontrados:"
+          echo "✅ Archivos encontrados:"
           ls -la packages/
         fi
-        
+
     - name: Subir artefactos
       uses: actions/upload-artifact@v4
       with:

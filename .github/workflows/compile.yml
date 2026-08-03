@@ -54,7 +54,14 @@ jobs:
         ./scripts/config --enable CONFIG_FAILSLAB
         ./scripts/config --enable CONFIG_FAIL_PAGE_ALLOC
         ./scripts/config --enable CONFIG_FAIL_MAKE_REQUEST
+        ./scripts/config --enable CONFIG_ATA
+        ./scripts/config --enable CONFIG_ATA_PIIX
+        ./scripts/config --enable CONFIG_PATA_ACPI
+        ./scripts/config --enable CONFIG_MODULES
+        ./scripts/config --enable CONFIG_MODULE_UNLOAD
         ./scripts/config --disable CONFIG_RANDOMIZE_BASE
+
+
         make olddefconfig
 
     - name: Compilar el kernel
